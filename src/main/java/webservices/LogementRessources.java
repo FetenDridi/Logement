@@ -12,6 +12,17 @@ public class LogementRessources {
 
     LogementBusiness helper = new LogementBusiness();
 
+    @GET
+    @Path("/getAll")
+    @Produces(MediaType.APPLICATION_JSON)
+    //@CrossOrigin(origins = "*")  // Permet toutes les origines
+    public Response getAll() {
+        return Response
+                .status(200)
+                .entity(helper.getLogements())
+                .build();
+    }
+
 
     @GET
     @Path("/{reference}")
@@ -78,7 +89,7 @@ public class LogementRessources {
 }
 
 
-    
+
 
 
 

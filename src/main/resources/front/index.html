@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestion des Logements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #eef2f7;
+            padding: 20px;
+        }
+        .tab {
+            overflow: hidden;
+            border-radius: 12px;
+            background-color: #f1f1f1;
+            display: flex;
+        }
+        .tab button {
+            background-color: inherit;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            font-size: 17px;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #ccc;
+        }
+        .tabcontent {
+            display: none;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: white;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        button.action-btn {
+            padding: 6px 10px;
+            font-size: 14px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .update-btn { background-color: #4CAF50; color: white; }
+        .delete-btn { background-color: #f44336; color: white; }
+    </style>
+</head>
+<body>
+<h2 style="text-align:center;">Gestion des Logements</h2>
+<div class="tab">
+    <button class="tablinks" onclick="openTab(event, 'Liste')">Liste des Logements</button>
+    <button class="tablinks" onclick="openTab(event, 'Ajouter')">Ajouter</button>
+    <button class="tablinks" onclick="openTab(event, 'Recherche')">Rechercher par délégation</button>
+</div>
+
+<div id="Liste" class="tabcontent">
+    <h3>Liste des Logements</h3>
+    <table id="logementTable">
+        <thead>
+        <tr>
+            <th>Référence</th>
+            <th>Type</th>
+            <th>Adresse</th>
+            <th>Gouvernorat</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!-- Logements will be inserted here -->
+        </tbody>
+    </table>
+    <p id="listeMessage"></p>
+</div>
+
+<div id="Ajouter" class="tabcontent">
+    <h3>Ajouter un Logement</h3>
+    <textarea id="logementData" placeholder='{"reference":1,"type":"Appartement","adresse":"Tunis", "gouvernorat":"Tunis"}' rows="5" cols="40"></textarea>
+    <button onclick="addLogement()">Ajouter</button>
+    <p id="addMessage"></p>
+</div>
+
+<div id="Recherche" class="tabcontent">
+    <h3>Rechercher Logements par Délégation</h3>
+    <input type="text" id="delegationInput" placeholder="Entrez la délégation">
+    <button onclick="searchByDelegation()">Rechercher</button>
+    <ul id="searchResults"></ul>
+    <p id="searchMessage"></p>
+</div>
+
+<script>
+    /////////////////////////////////////////////////////////////////
+    const API_BASE_URL = "http://localhost:8087/LogementRendezVous_Etudiant_war/api/logements/getAll";
+
+    const LISTE_MESSAGE_DURATION = 5000; // Durée d'affichage des messages (en ms)
+
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        if (tabName === 'Liste') {
+            loadLogements();
+        }
+    }
+
+    function loadLogements() {
+        const tableBody = document.querySelector("#logementTable tbody");
+        const listeMessage = document.getElementById("listeMessage");
+        tableBody.innerHTML = "";
+        listeMessage.textContent = "Chargement des logements...";
+
+        fetch(API_BASE_URL + "/getAll")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(logements => {
+                listeMessage.textContent = ""; // Efface le message de chargement.
+
+                if (logements.length === 0) {
+                    listeMessage.textContent = "Aucun logement trouvé.";
+                    return;
+                }
+
+                logements.forEach(logement => {
+                    const row = tableBody.insertRow();
+                    row.insertCell().textContent = logement.reference;
+                    row.insertCell().textContent = logement.type;
+                    row.insertCell().textContent = logement.adresse;
+                    row.insertCell().textContent = logement.gouvernorat;
+
+                    const actionsCell = row.insertCell();
+                    actionsCell.innerHTML = `
+                            <button class="action-btn update-btn" onclick="updateLogement(${logement.reference})">Mettre à jour</button>
+                            <button class="action-btn delete-btn" onclick="deleteLogement(${logement.reference})">Supprimer</button>
+                        `;
+                });
+            })
+            .catch(error => {
+                console.error("Erreur lors du chargement des logements:", error);
+                listeMessage.textContent = "Erreur lors du chargement des logements.";
+                setTimeout(() => listeMessage.textContent = "", LISTE_MESSAGE_DURATION); // Efface le message après quelques secondes.
+            });
+    }
+
+
+    function addLogement() {
+        const logementData = document.getElementById("logementData").value;
+        const addMessage = document.getElementById("addMessage");
+
+        try {
+            const logement = JSON.parse(logementData);
+
+            fetch(API_BASE_URL + "/ajouter", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(logement)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    return response.json(); // Assurez-vous que votre API renvoie le logement créé.
+                })
+                .then(logementAjoute => {
+                    addMessage.textContent = "Logement ajouté avec succès!";
+                    document.getElementById("logementData").value = ""; // Nettoie la zone de texte.
+                    loadLogements(); // Recharge la liste des logements.
+                    setTimeout(() => addMessage.textContent = "", LISTE_MESSAGE_DURATION);
+
+                })
+                .catch(error => {
+                    console.error("Erreur lors de l'ajout du logement:", error);
+                    addMessage.textContent = "Erreur lors de l'ajout du logement.";
+                    setTimeout(() => addMessage.textContent = "", LISTE_MESSAGE_DURATION);
+                });
+        } catch (error) {
+            console.error("Erreur de parsing JSON:", error);
+            addMessage.textContent = "Format JSON invalide.";
+            setTimeout(() => addMessage.textContent = "", LISTE_MESSAGE_DURATION);
+        }
+    }
+
+
+    function updateLogement(reference) {
+        // TODO: Implémenter la logique de mise à jour ici (par exemple, afficher un formulaire modal).
+        console.log("Mettre à jour le logement avec la référence:", reference);
+        alert("Fonctionnalité de mise à jour non implémentée.");
+    }
+
+    function deleteLogement(reference) {
+        const listeMessage = document.getElementById("listeMessage");
+
+        if (confirm("Êtes-vous sûr de vouloir supprimer ce logement?")) {
+            fetch(`${API_BASE_URL}/${reference}`, {
+                method: "DELETE"
+            })
+                .then(response => {
+                    if (response.ok) {
+                        listeMessage.textContent = "Logement supprimé avec succès.";
+                        loadLogements(); // Recharge la liste des logements.
+                        setTimeout(() => listeMessage.textContent = "", LISTE_MESSAGE_DURATION);
+                    } else {
+                        listeMessage.textContent = "Erreur lors de la suppression du logement.";
+                        setTimeout(() => listeMessage.textContent = "", LISTE_MESSAGE_DURATION);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la suppression du logement:", error);
+                    listeMessage.textContent = "Erreur lors de la suppression du logement.";
+                    setTimeout(() => listeMessage.textContent = "", LISTE_MESSAGE_DURATION);
+                });
+        }
+    }
+
+    function searchByDelegation() {
+        const delegation = document.getElementById("delegationInput").value;
+        const searchResultsList = document.getElementById("searchResults");
+        const searchMessage = document.getElementById("searchMessage");
+
+        searchResultsList.innerHTML = "";
+        searchMessage.textContent = "Recherche des logements...";
+
+        fetch(`${API_BASE_URL}/delegation/${delegation}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(logements => {
+                searchMessage.textContent = "";
+
+                if (logements.length === 0) {
+                    searchResultsList.innerHTML = "<li>Aucun logement trouvé pour cette délégation.</li>";
+                } else {
+                    logements.forEach(logement => {
+                        const listItem = document.createElement("li");
+                        listItem.textContent = `Référence: ${logement.reference}, Adresse: ${logement.adresse}, Gouvernorat: ${logement.gouvernorat}`;
+                        searchResultsList.appendChild(listItem);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la recherche par délégation:", error);
+                searchMessage.textContent = "Erreur lors de la recherche.";
+                setTimeout(() => searchMessage.textContent = "", LISTE_MESSAGE_DURATION); // Effacer le message après un délai
+                searchResultsList.innerHTML = ""; // Effacer les résultats précédents
+            });
+    }
+
+
+    // Charger l'onglet "Liste" par défaut
+    openTab(null, 'Liste');
+</script>
+</body>
+</html>
